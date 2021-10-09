@@ -1,6 +1,8 @@
 import copy
 import codecs
+from operator import getitem
 import numpy as np
+from tqdm import trange
 import tensorflow as tf
 from utils import BASEPATH
 from typing import List, Dict
@@ -18,7 +20,7 @@ class DataLoader(object):
         self.__bert_path = f"{bert_path}/vocab.txt"
         self.__tokenizer = self.__load_vocabulary()
         self.__dict_dataset = dict_dataset
-        self.__entity_base = EntityBase()
+        self.__entity_base = EntityBase(bert_path)
         self.__dict_ner_label = ["X"]
 
         self.__max_seq_len = 100
@@ -52,21 +54,30 @@ class DataLoader(object):
 
     def __parse_idx_sequence(self, pred, label):
         res_pred, res_label = [], []
+        records = {}
 
         for i in range(len(pred)):
             tmp_pred, tmp_label = [], []
+            str_pred = " ".join([str(ele) for ele in pred[i].numpy().tolist()])
+            str_label = " ".join([str(ele) for ele in label[i].numpy().tolist()])
+            str_record = str_pred + str_label
+            if str_record in records:
+                tmp = records[str_record]
+                res_pred.append(tmp[0])
+                res_label.append(tmp[1])
 
-            for p, l in zip(pred[i], label[i]):
-                if self.__dict_ner_label[l] != "X":
-                    tmp_label.append(self.__dict_ner_label[l])
+            else:
+                for p, l in zip(pred[i], label[i]):
+                    if self.__dict_ner_label[l] != "X":
+                        tmp_label.append(self.__dict_ner_label[l])
 
-                    if self.__dict_ner_label[p] == "X":
-                        tmp_pred.append("O")
-                    else:
-                        tmp_pred.append(self.__dict_ner_label[p])
-
-            res_pred.append(tmp_pred)
-            res_label.append(tmp_label)
+                        if self.__dict_ner_label[p] == "X":
+                            tmp_pred.append("O")
+                        else:
+                            tmp_pred.append(self.__dict_ner_label[p])
+                res_pred.append(tmp_pred)
+                res_label.append(tmp_label)
+                records[str_record] = (tmp_pred, tmp_label)
 
         return res_pred, res_label
 
@@ -75,7 +86,7 @@ class DataLoader(object):
         pred, true = self.__parse_idx_sequence(pred, label)
         y_real, pred_real = [], []
         records = []
-        for i in range(len(real_len)):
+        for i in trange(len(real_len), ascii=True):
             record = " ".join(true[i]) + str(real_len[i])
             if record not in records:
                 records.append(record)
@@ -133,7 +144,7 @@ class DataLoader(object):
         nen_label = nen_label.numpy().tolist()
         tmp_nen_pred = []
         tmp_nen_label = []
-        for i in range(len(nen_label)):
+        for i in trange(len(nen_label), ascii=True):
             n_entity = 0
             if nen_label[i] == 1:
                 for e in ner_label_real:
@@ -312,8 +323,9 @@ class DataLoader(object):
         parsed_ent_indices = []
         parsed_ent_segments = []
 
-        for sentence, ner, nen in zip(sentences, ner_label, nen_label):
-            samples = self.__extend_sample(sentence, ner, nen, 1)
+        for i in trange(len(sentences), ascii=True):
+            sentence, ner, nen = [ele[i] for ele in [sentences, ner_label, nen_label]]
+            samples = self.__extend_sample(sentence, ner, nen, 1, "test" in path)
 
             pkd_sentence = samples["sentences"]
             pkd_ner_tags = samples["ner"]
@@ -367,7 +379,12 @@ class DataLoader(object):
         return dataset
 
     def __extend_sample(
-        self, sentence: List[int], ner_tag: List[int], nen_tag: Dict, n_neg: int
+        self,
+        sentence: List[int],
+        ner_tag: List[int],
+        nen_tag: Dict,
+        n_neg: int,
+        flag: bool = False,
     ) -> Dict:
         """
         extend the sample to all samples with specific nen tags
@@ -395,13 +412,25 @@ class DataLoader(object):
             pkd_ent_sents.append(ent_sent)
             pkd_nen_tags.append(1)
         # Sampling negative entities
-        for i in range(n_neg):
-            pkd_ner_tags.append(["O"] * len(ner_tag))
-            pkd_cpt_ner_tags.append(ner_tag.copy())
-            pkd_sentences.append(sentence.copy())
-            ent_sent = self.__entity_base.random_entity(list(nen_tag.keys()))
-            pkd_ent_sents.append(ent_sent)
-            pkd_nen_tags.append(0)
+        if flag:
+            cands = self.__entity_base.generate_candidates(
+                sentence, list(nen_tag.keys())
+            )
+            for c in cands:
+                pkd_ner_tags.append(["O"] * len(ner_tag))
+                pkd_cpt_ner_tags.append(ner_tag.copy())
+                pkd_sentences.append(sentence.copy())
+                ent_sent = self.__entity_base.getItem(c)
+                pkd_ent_sents.append(ent_sent)
+                pkd_nen_tags.append(0)
+        else:
+            for i in range(n_neg):
+                pkd_ner_tags.append(["O"] * len(ner_tag))
+                pkd_cpt_ner_tags.append(ner_tag.copy())
+                pkd_sentences.append(sentence.copy())
+                ent_sent = self.__entity_base.random_entity(list(nen_tag.keys()))
+                pkd_ent_sents.append(ent_sent)
+                pkd_nen_tags.append(0)
 
         return {
             "ner": pkd_ner_tags,
