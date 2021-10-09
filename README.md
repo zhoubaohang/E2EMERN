@@ -3,7 +3,7 @@
 
 [Authors] Baohang Zhou, Xiangrui Cai, Ying Zhang, Xiaojie Yuan
 
-[ACL 2021 paper (Waiting for publication)]()
+[ACL 2021 paper](https://aclanthology.org/2021.acl-long.485/)
 
 ## Preparation
 1. Clone the repo to your local.
@@ -47,4 +47,22 @@ python main.py \
 paper. You can download the [weights file](https://pan.baidu.com/s/15DLSb2fvgbOiiv0V0ADFNg) (the extraction code **1234**) and put them into the "weights" folder. Then run the following command:
 ```cmd
 ./eval.ncbi.sh or ./eval.bc5cdr.sh
+```
+
+Bibtex:
+```
+@inproceedings{zhou-etal-2021-end,
+    title = "An End-to-End Progressive Multi-Task Learning Framework for Medical Named Entity Recognition and Normalization",
+    author = "Zhou, Baohang  and
+      Cai, Xiangrui  and
+      Zhang, Ying  and
+      Yuan, Xiaojie",
+    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
+    month = aug,
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.acl-long.485",
+    pages = "6214--6224",
+}
 ```
